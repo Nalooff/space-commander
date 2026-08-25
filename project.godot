@@ -26,3 +26,10 @@ event_bus/config/show_argument_names=false
 event_bus/config/show_emitter_line_number=true
 event_bus/config/show_receiver_line_number=false
 event_bus/signals/game_started=false
+
+[file_customization]
+
+folder_colors={
+"res://Autoload/": "red",
+"res://Spaceship/": "orange"
+}
