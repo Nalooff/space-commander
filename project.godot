@@ -13,3 +13,16 @@ config_version=5
 config/name="Space Commander"
 config/features=PackedStringArray("4.4", "Forward Plus")
 config/icon="res://icon.svg"
+
+[autoload]
+
+EventBus="*res://Autoload/EventBus.gd"
+GData="*res://Autoload/GData.gd"
+Global="*res://Autoload/Global.gd"
+
+[debug]
+
+event_bus/config/show_argument_names=false
+event_bus/config/show_emitter_line_number=true
+event_bus/config/show_receiver_line_number=false
+event_bus/signals/game_started=false
