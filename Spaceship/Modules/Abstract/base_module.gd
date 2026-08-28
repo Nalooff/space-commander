@@ -21,27 +21,3 @@ func _ready() -> void:
 	
 	if mode_center_of_mass == CENTER_OF_MASS_MODE.AUTO:
 		center_of_mass = centroid
-
-func _calculate_CoM() -> Vector3:
-	var shape := collision_shape_3d.shape
-
-
-	if shape is ConvexPolygonShape3D:
-		var points: PackedVector3Array = shape.points
-		var centroid := Vector3.ZERO
-		
-		if points.is_empty():
-			return centroid
-
-		for point in points:
-			centroid += point
-
-		centroid /= points.size()
-
-		# Account for the CollisionShape3D's local transform.
-		centroid *= collision_shape_3d.transform
-
-		return centroid
-
-	push_warning("Collision shape is not a ConvexPolygonShape3D.")
-	return Vector3.ZERO
