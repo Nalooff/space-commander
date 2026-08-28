@@ -1,0 +1,23 @@
+[gd_scene load_steps=5 format=3 uid="uid://dkeuak6ximmvp"]
+
+[ext_resource type="PackedScene" uid="uid://bfq6n3cxpjr1e" path="res://Spaceship/Modules/Abstract/base_module.tscn" id="1_waavi"]
+[ext_resource type="Script" uid="uid://dwogbvm8hf5xc" path="res://Spaceship/Modules/thruster_module.gd" id="2_7x37e"]
+
+[sub_resource type="Curve" id="Curve_waavi"]
+_data = [Vector2(0, 0), 0.0, 1.4, 0, 0, Vector2(1, 1), 0.0, 0.0, 0, 0]
+point_count = 2
+
+[sub_resource type="Curve" id="Curve_7x37e"]
+_data = [Vector2(0, 1), 1.4, 0.0, 0, 0, Vector2(1, 0), -2.81418, 0.0, 0, 0]
+point_count = 2
+
+[node name="Thruster" instance=ExtResource("1_waavi")]
+script = ExtResource("2_7x37e")
+max_thrust = 50000.0
+thrust_direction = Vector3(0, 0, -1)
+ramp_up_time = 0.5
+ramp_down_time = 0.3
+accel_curve = SubResource("Curve_waavi")
+decel_curve = SubResource("Curve_7x37e")
+max_gimbal_degrees = Vector3(15, 15, 0)
+gimbal_speed_deg = 60.0

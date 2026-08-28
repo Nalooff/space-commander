@@ -1,4 +1,5 @@
 extends RigidBody3D
+class_name SpaceShip
 
 @export var modules_container: Node3D
 

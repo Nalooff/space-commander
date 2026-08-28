@@ -1,6 +1,8 @@
 extends RefCounted
 class_name ShapeInfo
 
+# will need to add the possibility to work for 2D shape
+
 ## ============================================================================
 ## ShapeInfo
 ## Calculates the geometric volume centroid.
@@ -174,13 +176,14 @@ static func _get_mesh(mesh: Mesh, transform: Transform3D) -> Result:
 		if vertices.is_empty():
 			continue
 
-		var indices: PackedInt32Array = arrays[Mesh.ARRAY_INDEX]
+		var indices = arrays[Mesh.ARRAY_INDEX]
+		var has_indices: bool = (indices != null and not indices.is_empty())
 
 		# ================================================================
 		# INDEXED TRIANGLES
 		# ================================================================
 		
-		if not indices.is_empty():
+		if has_indices:
 			if indices.size() % 3 != 0:
 				push_warning("CenterOfMass3D: Mesh surface has an index count that is not divisible by 3.")
 

@@ -2,12 +2,13 @@
 
 [ext_resource type="Script" uid="uid://dgp3ieckg75f7" path="res://Spaceship/Modules/Abstract/base_module.gd" id="1_3c776"]
 
-[sub_resource type="BoxMesh" id="BoxMesh_ucvcc"]
+[sub_resource type="ConvexPolygonShape3D" id="ConvexPolygonShape3D_3c776"]
+points = PackedVector3Array(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 1)
 
 [node name="BaseModule" type="Node3D"]
 script = ExtResource("1_3c776")
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+shape = SubResource("ConvexPolygonShape3D_3c776")
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="."]
-mesh = SubResource("BoxMesh_ucvcc")
