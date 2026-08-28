@@ -17,8 +17,8 @@ func _ready() -> void:
 	var shape_info = ShapeInfo.get_result(collision_shape_3d)
 	
 	centroid = shape_info.centroid
-	volume = shape_info.volume
+	volume = shape_info.measure
 	
 	if mode_center_of_mass == CENTER_OF_MASS_MODE.AUTO:
 		center_of_mass = centroid
-	print(center_of_mass)
+	print(str(shape_info))
