@@ -1,6 +1,5 @@
-# FlightComputer.gd
-class_name FlightComputer
 extends Node
+
 
 # Inner class used purely for caching pre-calculated values per thruster
 class ThrusterData:
