@@ -10,10 +10,17 @@ enum CENTER_OF_MASS_MODE {AUTO, CUSTOM}
 @export var mass: float = 100.0
 @export var mode_center_of_mass: CENTER_OF_MASS_MODE = CENTER_OF_MASS_MODE.AUTO
 @export var center_of_mass: Vector3 = Vector3.ZERO
+var centroid
+var volume
 
 func _ready() -> void:
+	var shape_info = ShapeInfo.get_result(collision_shape_3d)
+	
+	centroid = shape_info.centroid
+	volume = shape_info.volume
+	
 	if mode_center_of_mass == CENTER_OF_MASS_MODE.AUTO:
-		center_of_mass = _calculate_CoM()
+		center_of_mass = centroid
 
 func _calculate_CoM() -> Vector3:
 	var shape := collision_shape_3d.shape
