@@ -1,29 +1,23 @@
 extends RefCounted
 class_name ShapeInfo
 
-## ============================================================================
-## ShapeInfo
+## Tool to calculate both Centroid and Volume/Area
+##
 ## Calculates the geometric volume/area centroid and magnitude.
 ##
-## SUPPORTED 3D:
-##     MeshInstance3D
-##     MultiMeshInstance3D
-##     CollisionShape3D (Box, Sphere, Cylinder, Capsule, Convex, Concave)
-##     CollisionPolygon3D
+## SUPPORTED 3D: 
+##     MeshInstance3D, 
+##     MultiMeshInstance3D, 
+##     CSGShape3D (Box, Sphere, Cylinder, Mesh, Polygon, Combiner),
+##     CollisionShape3D (Box, Sphere, Cylinder, Capsule, Convex, Concave), 
+##     CollisionPolygon3D, 
 ##
-## SUPPORTED 2D:
-##     Sprite2D
-##     CollisionShape2D (RectangleShape2D, CircleShape2D, SegmentShape2D, CapsuleShape2D)
-##     CollisionPolygon2D
-##
-## Features:
-## - Handles closed solid 3D shapes (Volume weighting via signed tetrahedrons).
-## - Handles open/flat 3D shapes like single triangles (Area weighting).
-## - Native support for 2D Node trees.
-## ============================================================================
+## SUPPORTED 2D: 
+##     Sprite2D, 
+##     CollisionShape2D (RectangleShape2D, CircleShape2D, SegmentShape2D, CapsuleShape2D), 
+##     CollisionPolygon2D.
 
 const EPSILON: float = 0.000000001
-
 
 
 # ============================================================================
@@ -73,6 +67,8 @@ static func get_result(node: Node) -> Result:
 		return _get_mesh_instance(node)
 	if node is MultiMeshInstance3D:
 		return _get_multimesh_instance(node)
+	if node is CSGShape3D:
+		return _get_csg_shape_3d(node)
 	if node is CollisionShape3D:
 		return _get_collision_shape_3d(node)
 	if node is CollisionPolygon3D:
@@ -128,7 +124,7 @@ static func _accumulate_recursive(node: Node, data: Dictionary) -> void:
 		_accumulate_recursive(child, data)
 
 # ============================================================================
-# 3D PROCESSING
+# 3D PROCESSING: MESHES & PRIMITIVES
 # ============================================================================
 
 static func _get_mesh_instance(node: MeshInstance3D) -> Result:
@@ -158,6 +154,12 @@ static func _get_multimesh_instance(node: MultiMeshInstance3D) -> Result:
 	return Result.new(weighted_center / total_measure, total_measure, 3)
 
 static func _get_mesh(mesh: Mesh, transform: Transform3D) -> Result:
+	# Fast-path evaluation for known analytical PrimitiveMeshes
+	if mesh is PrimitiveMesh:
+		var prim_res := _get_primitive_mesh_analytical(mesh, transform)
+		if prim_res != null:
+			return prim_res
+
 	var total_signed_volume := 0.0
 	var weighted_volume_center := Vector3.ZERO
 	
@@ -173,8 +175,8 @@ static func _get_mesh(mesh: Mesh, transform: Transform3D) -> Result:
 		if vertices.is_empty():
 			continue
 
-		var indices = arrays[Mesh.ARRAY_INDEX]
-		var has_indices: bool = (indices != null and not indices.is_empty())
+		var indices: PackedInt32Array = arrays[Mesh.ARRAY_INDEX] if arrays[Mesh.ARRAY_INDEX] != null else PackedInt32Array()
+		var has_indices: bool = not indices.is_empty()
 
 		if has_indices:
 			for i in range(0, indices.size() - 2, 3):
@@ -182,12 +184,10 @@ static func _get_mesh(mesh: Mesh, transform: Transform3D) -> Result:
 				var b := vertices[indices[i + 1]]
 				var c := vertices[indices[i + 2]]
 				
-				# Volume Integration
 				var v_contrib := _triangle_volume_contribution(a, b, c, transform)
 				total_signed_volume += v_contrib.measure
 				weighted_volume_center += v_contrib.centroid * v_contrib.measure
 
-				# Area Integration (Fallback for flat/open meshes)
 				var a_contrib := _triangle_area_contribution(a, b, c, transform)
 				total_area += a_contrib.measure
 				weighted_area_center += a_contrib.centroid * a_contrib.measure
@@ -205,15 +205,60 @@ static func _get_mesh(mesh: Mesh, transform: Transform3D) -> Result:
 				total_area += a_contrib.measure
 				weighted_area_center += a_contrib.centroid * a_contrib.measure
 
-	# If solid closed mesh (has volume):
 	if abs(total_signed_volume) > EPSILON:
 		return Result.new(weighted_volume_center / total_signed_volume, abs(total_signed_volume), 3)
 	
-	# Fallback for flat surfaces / single triangles (2D planes in 3D space):
 	if total_area > EPSILON:
 		return Result.new(weighted_area_center / total_area, total_area, 3)
 
 	return Result.new(transform.origin, 0.0, 3)
+
+static func _get_primitive_mesh_analytical(mesh: PrimitiveMesh, transform: Transform3D) -> Result:
+	if mesh is BoxMesh:
+		var size: Vector3 = (mesh as BoxMesh).size
+		return _primitive_result_3d(transform, size.x * size.y * size.z)
+
+	if mesh is SphereMesh:
+		var r: float = (mesh as SphereMesh).radius
+		return _primitive_result_3d(transform, (4.0 / 3.0) * PI * pow(r, 3))
+
+	if mesh is CylinderMesh:
+		var cyl := mesh as CylinderMesh
+		var r: float = cyl.top_radius
+		# Simplified analytical approach if uniform cylinder
+		if abs(cyl.top_radius - cyl.bottom_radius) < EPSILON:
+			return _primitive_result_3d(transform, PI * pow(r, 2) * cyl.height)
+
+	if mesh is CapsuleMesh:
+		var cap := mesh as CapsuleMesh
+		var r: float = cap.radius
+		var h: float = cap.height
+		var cyl_h: float = max(0.0, h - 2.0 * r)
+		var vol := (PI * pow(r, 2) * cyl_h) + ((4.0 / 3.0) * PI * pow(r, 3))
+		return _primitive_result_3d(transform, vol)
+
+	if mesh is PrismMesh:
+		var prism := mesh as PrismMesh
+		var s: Vector3 = prism.size
+		var vol := 0.5 * s.x * s.y * s.z
+		return _primitive_result_3d(transform, vol)
+
+	if mesh is TorusMesh:
+		var torus := mesh as TorusMesh
+		var R: float = torus.inner_radius + (torus.outer_radius - torus.inner_radius) * 0.5
+		var r: float = (torus.outer_radius - torus.inner_radius) * 0.5
+		var vol := 2.0 * pow(PI, 2) * R * pow(r, 2)
+		return _primitive_result_3d(transform, vol)
+
+	if mesh is QuadMesh:
+		var size: Vector2 = (mesh as QuadMesh).size
+		return _primitive_surface_result_3d(transform, size.x * size.y)
+
+	if mesh is PlaneMesh:
+		var size: Vector2 = (mesh as PlaneMesh).size
+		return _primitive_surface_result_3d(transform, size.x * size.y)
+
+	return null
 
 static func _triangle_volume_contribution(a: Vector3, b: Vector3, c: Vector3, transform: Transform3D) -> Result:
 	var local_signed_volume := a.dot(b.cross(c)) / 6.0
@@ -229,6 +274,20 @@ static func _triangle_area_contribution(a: Vector3, b: Vector3, c: Vector3, tran
 	var area := (gb - ga).cross(gc - ga).length() * 0.5
 	var centroid := (ga + gb + gc) / 3.0
 	return Result.new(centroid, area, 3)
+
+# ============================================================================
+# CSG SHAPES 3D
+# ============================================================================
+
+static func _get_csg_shape_3d(node: CSGShape3D) -> Result:
+	if not node.is_root_shape():
+		return Result.new(node.global_position, 0.0, 3)
+
+	var baked_mesh := node.bake_static_mesh()
+	if baked_mesh == null:
+		return Result.new(node.global_position, 0.0, 3)
+
+	return _get_mesh(baked_mesh, node.global_transform)
 
 # ============================================================================
 # COLLISION SHAPE 3D
@@ -274,6 +333,11 @@ static func _get_collision_shape_3d(node: CollisionShape3D) -> Result:
 static func _primitive_result_3d(transform: Transform3D, local_volume: float) -> Result:
 	var global_volume: float = local_volume * abs(transform.basis.determinant())
 	return Result.new(transform.origin, global_volume, 3)
+
+static func _primitive_surface_result_3d(transform: Transform3D, local_area: float) -> Result:
+	var scale_x := transform.basis.x.length()
+	var scale_z := transform.basis.z.length()
+	return Result.new(transform.origin, local_area * scale_x * scale_z, 3)
 
 static func _get_triangle_faces_3d(faces: PackedVector3Array, transform: Transform3D) -> Result:
 	if faces.size() < 3:
@@ -334,9 +398,10 @@ static func _get_collision_shape_2d(node: CollisionShape2D) -> Result:
 		return _primitive_result_2d(xform, area)
 
 	if shape is SegmentShape2D:
-		var mid: Vector2 = (shape.a + shape.b) * 0.5
-		var g_mid := xform * mid
-		return _to_result_2d(g_mid, shape.a.distance_to(shape.b))
+		var g_a: Vector2 = xform * shape.a
+		var g_b: Vector2 = xform * shape.b
+		var g_mid: Vector2 = (g_a + g_b) * 0.5
+		return _to_result_2d(g_mid, g_a.distance_to(g_b))
 
 	return _to_result_2d(node.global_position, 0.0)
 
@@ -352,9 +417,7 @@ static func _get_collision_polygon_2d(node: CollisionPolygon2D) -> Result:
 
 	var local_center := _polygon_centroid(polygon)
 	var global_center := node.global_transform * local_center
-	
-	# Scale area based on matrix determinant (2D scale factor)
-	var scale_factor: float = abs(node.global_transform.get_scale().x * node.global_transform.get_scale().y)
+	var scale_factor: float = abs(node.global_transform.x.cross(node.global_transform.y))
 	return _to_result_2d(global_center, area * scale_factor)
 
 static func _get_sprite_2d(node: Sprite2D) -> Result:
@@ -365,12 +428,12 @@ static func _get_sprite_2d(node: Sprite2D) -> Result:
 	var local_center := rect.get_center()
 	var area := rect.size.x * rect.size.y
 	var global_center := node.global_transform * local_center
-	var scale_factor: float = abs(node.global_transform.get_scale().x * node.global_transform.get_scale().y)
+	var scale_factor: float = abs(node.global_transform.x.cross(node.global_transform.y))
 
 	return _to_result_2d(global_center, area * scale_factor)
 
 static func _primitive_result_2d(transform: Transform2D, local_area: float) -> Result:
-	var scale_factor: float = abs(transform.get_scale().x * transform.get_scale().y)
+	var scale_factor: float = abs(transform.x.cross(transform.y))
 	return _to_result_2d(transform.origin, local_area * scale_factor)
 
 static func _to_result_2d(pos_2d: Vector2, area: float) -> Result:
