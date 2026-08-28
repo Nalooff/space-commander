@@ -19,7 +19,6 @@ class_name ShapeInfo
 
 const EPSILON: float = 0.000000001
 
-
 # ============================================================================
 # RESULT
 # ============================================================================
@@ -36,21 +35,12 @@ class Result:
 
 	func _to_string() -> String:
 		var unit_label: String = "Volume" if dimension == 3 else "Area"
-		
 		if dimension == 2:
 			return "(Centroid: (%.3f, %.3f), %s: %.3f, Dim: 2D)" % [
-				centroid.x, 
-				centroid.y, 
-				unit_label, 
-				measure
+				centroid.x, centroid.y, unit_label, measure
 			]
-		
 		return "(Centroid: (%.3f, %.3f, %.3f), %s: %.3f, Dim: 3D)" % [
-			centroid.x, 
-			centroid.y, 
-			centroid.z, 
-			unit_label, 
-			measure
+			centroid.x, centroid.y, centroid.z, unit_label, measure
 		]
 
 # ============================================================================
@@ -62,7 +52,7 @@ static func get_result(node: Node) -> Result:
 	if node == null:
 		return Result.new()
 
-	# --- 3D NODES ---
+	# 3D Nodes
 	if node is MeshInstance3D:
 		return _get_mesh_instance(node)
 	if node is MultiMeshInstance3D:
@@ -74,7 +64,7 @@ static func get_result(node: Node) -> Result:
 	if node is CollisionPolygon3D:
 		return _get_collision_polygon_3d(node)
 
-	# --- 2D NODES ---
+	# 2D Nodes
 	if node is CollisionShape2D:
 		return _get_collision_shape_2d(node)
 	if node is CollisionPolygon2D:
@@ -124,7 +114,7 @@ static func _accumulate_recursive(node: Node, data: Dictionary) -> void:
 		_accumulate_recursive(child, data)
 
 # ============================================================================
-# 3D PROCESSING: MESHES & PRIMITIVES
+# 3D PROCESSING
 # ============================================================================
 
 static func _get_mesh_instance(node: MeshInstance3D) -> Result:
@@ -154,7 +144,6 @@ static func _get_multimesh_instance(node: MultiMeshInstance3D) -> Result:
 	return Result.new(weighted_center / total_measure, total_measure, 3)
 
 static func _get_mesh(mesh: Mesh, transform: Transform3D) -> Result:
-	# Fast-path evaluation for known analytical PrimitiveMeshes
 	if mesh is PrimitiveMesh:
 		var prim_res := _get_primitive_mesh_analytical(mesh, transform)
 		if prim_res != null:
@@ -162,7 +151,6 @@ static func _get_mesh(mesh: Mesh, transform: Transform3D) -> Result:
 
 	var total_signed_volume := 0.0
 	var weighted_volume_center := Vector3.ZERO
-	
 	var total_area := 0.0
 	var weighted_area_center := Vector3.ZERO
 
@@ -224,10 +212,8 @@ static func _get_primitive_mesh_analytical(mesh: PrimitiveMesh, transform: Trans
 
 	if mesh is CylinderMesh:
 		var cyl := mesh as CylinderMesh
-		var r: float = cyl.top_radius
-		# Simplified analytical approach if uniform cylinder
 		if abs(cyl.top_radius - cyl.bottom_radius) < EPSILON:
-			return _primitive_result_3d(transform, PI * pow(r, 2) * cyl.height)
+			return _primitive_result_3d(transform, PI * pow(cyl.top_radius, 2) * cyl.height)
 
 	if mesh is CapsuleMesh:
 		var cap := mesh as CapsuleMesh
@@ -366,7 +352,7 @@ static func _get_collision_polygon_3d(node: CollisionPolygon3D) -> Result:
 
 	var center_2d := _polygon_centroid(polygon)
 	var local_centroid := Vector3(center_2d.x, center_2d.y, 0.0)
-	var local_volume: float = area * node.depth * 2.0
+	var local_volume: float = area * node.depth
 	var global_volume: float = local_volume * abs(node.global_transform.basis.determinant())
 
 	return Result.new(node.global_transform * local_centroid, global_volume, 3)
