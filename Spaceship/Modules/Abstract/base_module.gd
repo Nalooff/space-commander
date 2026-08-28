@@ -21,4 +21,3 @@ func _ready() -> void:
 	
 	if mode_center_of_mass == CENTER_OF_MASS_MODE.AUTO:
 		center_of_mass = centroid
-	print(str(shape_info))
